@@ -9,6 +9,8 @@
 
 Hermes Agent iOS keeps execution in [Hermes Agent](https://hermes-agent.nousresearch.com/) and turns the phone into the control surface: see what an agent is doing, approve risky steps, answer blocking prompts, and keep secrets out of transcripts and logs.
 
+![Synthetic Hermes Agent iOS operator cockpit screenshot](docs/assets/hermes-agent-ios-synthetic-cockpit.png)
+
 | Status | Focus | Safety posture |
 | --- | --- | --- |
 | Early-stage, simulator-first | Operator UX for mobile agent supervision | Deterministic fixtures, explicit approvals, redacted secret/sudo flows |
@@ -65,6 +67,16 @@ Safety rules in this repo:
 - Swift 6 toolchain.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) for regenerating the Xcode project.
 
+## Quickstart
+
+```zsh
+git clone https://github.com/tinyleed/hermes-agent-ios.git
+cd hermes-agent-ios
+./scripts/test_all.sh
+```
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for toolchain checks, XcodeGen setup, and first-contribution guidance.
+
 ## Build and test
 
 Run the full local gate:
@@ -109,6 +121,8 @@ Expected result:
 ```text
 OK mock blocking fixture WS: approval -> sudo -> secret -> redacted final output
 ```
+
+For the full simulator/UI fixture path, see [`docs/blocking-card-fixture-flow.md`](docs/blocking-card-fixture-flow.md).
 
 ## Simulator
 
