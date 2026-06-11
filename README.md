@@ -110,6 +110,8 @@ Expected result:
 OK mock blocking fixture WS: approval -> sudo -> secret -> redacted final output
 ```
 
+For the full simulator/UI fixture path, see [`docs/blocking-card-fixture-flow.md`](docs/blocking-card-fixture-flow.md).
+
 ## Simulator
 
 Regenerate/build first:
