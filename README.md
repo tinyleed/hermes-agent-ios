@@ -1,8 +1,17 @@
 # Hermes Agent iOS
 
-Hermes Agent iOS is a native iPhone operator cockpit for [Hermes Agent](https://hermes-agent.nousresearch.com/). It focuses on safe human-in-the-loop control of agentic workflows: mobile chat, approvals, secret-redacted gateway control, and operator visibility while Hermes remains the execution engine.
+[![CI](https://github.com/tinyleed/hermes-agent-ios/actions/workflows/ci.yml/badge.svg)](https://github.com/tinyleed/hermes-agent-ios/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Swift 6](https://img.shields.io/badge/Swift-6-orange.svg)](Package.swift)
+[![iOS 17+](https://img.shields.io/badge/iOS-17%2B-lightgrey.svg)](project.yml)
 
-The app is early-stage, simulator-first, and designed around deterministic contracts and mock gateways before live device or hosted-gateway work.
+**A native iPhone operator cockpit for Hermes Agent — built for mobile chat, human approvals, secret-redacted gateway control, and safe supervision of agentic workflows.**
+
+Hermes Agent iOS keeps execution in [Hermes Agent](https://hermes-agent.nousresearch.com/) and turns the phone into the control surface: see what an agent is doing, approve risky steps, answer blocking prompts, and keep secrets out of transcripts and logs.
+
+| Status | Focus | Safety posture |
+| --- | --- | --- |
+| Early-stage, simulator-first | Operator UX for mobile agent supervision | Deterministic fixtures, explicit approvals, redacted secret/sudo flows |
 
 ## Why it exists
 
