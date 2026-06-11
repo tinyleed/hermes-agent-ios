@@ -1,0 +1,1 @@
+{"type":"object","required":["id","title","lane","createdAt","updatedAt","projectId"],"properties":{"id":{"type":"string"},"title":{"type":"string"},"lane":{"type":"string"},"createdAt":{"type":"string"},"updatedAt":{"type":"string"},"projectId":{"type":["string","null"]}}}

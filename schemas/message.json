@@ -1,0 +1,1 @@
+{"type":"object","required":["id","threadId","role","kind","body","card","createdAt"],"properties":{"id":{"type":"string"},"threadId":{"type":"string"},"role":{"enum":["user","assistant","system","tool"]},"kind":{"type":"string"},"body":{"type":"string"},"card":{"type":"object"},"createdAt":{"type":"string"}}}
