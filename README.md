@@ -9,6 +9,8 @@
 
 Hermes Agent iOS keeps execution in [Hermes Agent](https://hermes-agent.nousresearch.com/) and turns the phone into the control surface: see what an agent is doing, approve risky steps, answer blocking prompts, and keep secrets out of transcripts and logs.
 
+![Synthetic Hermes Agent iOS operator cockpit screenshot](docs/assets/hermes-agent-ios-synthetic-cockpit.png)
+
 | Status | Focus | Safety posture |
 | --- | --- | --- |
 | Early-stage, simulator-first | Operator UX for mobile agent supervision | Deterministic fixtures, explicit approvals, redacted secret/sudo flows |
