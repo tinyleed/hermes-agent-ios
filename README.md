@@ -65,6 +65,16 @@ Safety rules in this repo:
 - Swift 6 toolchain.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) for regenerating the Xcode project.
 
+## Quickstart
+
+```zsh
+git clone https://github.com/tinyleed/hermes-agent-ios.git
+cd hermes-agent-ios
+./scripts/test_all.sh
+```
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for toolchain checks, XcodeGen setup, and first-contribution guidance.
+
 ## Build and test
 
 Run the full local gate:
