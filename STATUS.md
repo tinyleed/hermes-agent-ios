@@ -15,6 +15,6 @@ Known limitations:
 - The project is not yet production-ready or App Store-ready.
 - Physical-device flows require local signing and a reachable private Hermes host.
 - Hosted/public gateway auth is intentionally deferred.
-- The Share Extension activation predicate is broad for development and must be narrowed before App Store/TestFlight submission.
+- The Share Extension activation rule is narrowed for text and one web URL; broader media/file support still needs deliberate design before App Store/TestFlight submission.
 
 See [`ROADMAP.md`](ROADMAP.md) for current priorities.
