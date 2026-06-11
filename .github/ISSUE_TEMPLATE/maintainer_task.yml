@@ -1,0 +1,50 @@
+name: "🧰 Maintainer task"
+description: Track a small autonomous-maintenance slice
+title: "[Task]: "
+labels: ["type/task", "needs-triage"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What observable state means this is done?
+      placeholder: A focused PR exists, CI passes, and the README/fixture/workflow is updated.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What should be touched? What should not be touched?
+      placeholder: Touch ..., do not touch signing/secrets/live gateway settings.
+    validations:
+      required: true
+
+  - type: textarea
+    id: likely-files
+    attributes:
+      label: Likely files
+      description: Optional file paths or areas.
+      placeholder: |
+        - README.md
+        - .github/workflows/ci.yml
+        - tests/...
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Required verification
+      description: Exact checks expected before closing.
+      placeholder: |
+        - git diff --check
+        - ./scripts/test_all.sh
+    validations:
+      required: true
+
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk / escalation boundary
+      description: When should the agent stop and ask for human review?
+      placeholder: Stop before making public visibility/auth/signing/security-sensitive changes.

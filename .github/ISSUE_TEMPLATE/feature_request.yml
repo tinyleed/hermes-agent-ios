@@ -1,23 +1,76 @@
-name: Feature request
-description: Propose a focused improvement
-labels: [enhancement]
+name: "✨ Feature request"
+description: Propose a focused improvement for Hermes Agent iOS
+title: "[Feature]: "
+labels: ["type/feature", "needs-triage"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. The best requests are small, testable, and tied to an operator workflow.
+
   - type: textarea
     id: problem
     attributes:
-      label: Problem
-      description: What operator or maintainer problem does this solve?
+      label: Problem or use case
+      description: What operator/maintainer problem does this solve?
+      placeholder: I want to approve/respond to agent runs from iPhone when...
     validations:
       required: true
+
   - type: textarea
     id: proposal
     attributes:
-      label: Proposal
-      description: Describe the smallest useful version.
+      label: Proposed solution
+      description: Describe the smallest useful version. Include UI, gateway, fixture, or workflow details if relevant.
     validations:
       required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Feature area
+      options:
+        - Mobile operator UX
+        - Approval/sudo/secret flow
+        - Gateway/WebSocket integration
+        - Mock gateway / deterministic fixture
+        - App Intents / Share Extension / Live Activity
+        - Notifications / APNs
+        - Physical-device bootstrap/signing
+        - Tests / CI / developer experience
+        - Documentation / workflow
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Expected scope
+      options:
+        - Small: one focused slice
+        - Medium: a few files, contract-first
+        - Large: needs design issue first
+    validations:
+      required: true
+
   - type: textarea
     id: safety
     attributes:
       label: Security/privacy considerations
-      description: Mention approval, secret, gateway auth, notification, or logging implications.
+      description: Mention approval, secret handling, gateway auth, notifications, screenshots/logs, or device bootstrap implications.
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification idea
+      description: What command, fixture, simulator proof, or screenshot would prove this works?
+      placeholder: Add/adjust fixture, run `./scripts/test_all.sh`, and include a simulator screenshot.
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to implement this and submit a PR.
+          required: false

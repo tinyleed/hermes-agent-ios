@@ -1,36 +1,85 @@
-name: Bug report
-description: Report a reproducible bug
-labels: [bug]
+name: "🐛 Bug report"
+description: Report a reproducible bug in Hermes Agent iOS
+title: "[Bug]: "
+labels: ["type/bug", "needs-triage"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please keep examples synthetic and redact secrets, tokens, private device IDs, private hostnames, and bootstrap URLs.
+
+        Before submitting:
+        - Search existing issues to avoid duplicates.
+        - Try the latest `main` if possible.
+        - Run the smallest relevant verification command you can.
+
   - type: textarea
     id: summary
     attributes:
-      label: Summary
-      description: What happened?
+      label: Bug description
+      description: What is broken? What did you expect instead?
+      placeholder: The app shows..., but I expected...
     validations:
       required: true
+
   - type: textarea
-    id: steps
+    id: reproduction
     attributes:
-      label: Reproduction steps
-      description: Provide the smallest reliable reproduction.
+      label: Steps to reproduce
+      description: Minimal steps that trigger the bug.
+      placeholder: |
+        1. Run `./scripts/test_all.sh`
+        2. Open the simulator
+        3. Tap ...
+        4. Observe ...
     validations:
       required: true
-  - type: textarea
-    id: expected
+
+  - type: dropdown
+    id: component
     attributes:
-      label: Expected behavior
+      label: Affected area
+      multiple: true
+      options:
+        - SwiftUI app shell
+        - HermesAgentCore contracts/runtime
+        - Gateway/WebSocket integration
+        - Approval/sudo/secret blocking cards
+        - Mock gateway / fixtures
+        - Simulator build or UI test
+        - Physical-device bootstrap/signing
+        - Share Extension / App Intents / Live Activity
+        - Documentation / repository workflow
+        - Other
     validations:
       required: true
-  - type: textarea
-    id: verification
+
+  - type: input
+    id: platform
     attributes:
-      label: Logs or verification
-      description: Redact secrets before posting.
+      label: Platform
+      description: macOS/Xcode/iOS Simulator/device version, if relevant.
+      placeholder: macOS 15.x, Xcode 16.x, iOS 18.x simulator
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or verification output
+      description: Paste compact output only. Redact secrets and private hostnames.
+      render: shell
+
+  - type: textarea
+    id: root-cause
+    attributes:
+      label: Root cause / proposed fix (optional)
+      description: If you have investigated, include file paths, line numbers, and the smallest proposed fix.
+
   - type: checkboxes
     id: safety
     attributes:
       label: Safety check
       options:
-        - label: I have removed tokens, passwords, private device IDs, and private bootstrap URLs.
+        - label: I removed tokens, passwords, bootstrap links, private hostnames, private device IDs, and private screenshots/logs.
           required: true
+        - label: I can help test or submit a PR for this.
+          required: false

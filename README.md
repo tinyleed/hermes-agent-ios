@@ -130,7 +130,7 @@ This project is a clean open-source release of an actively developed iOS compani
 
 ## Contributing
 
-Contributions are welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md), and treat changes around gateway auth, approval handling, deep links, bootstrap artifacts, and secret display as security-sensitive.
+Contributions are welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`docs/maintainer-workflow.md`](docs/maintainer-workflow.md), and treat changes around gateway auth, approval handling, deep links, bootstrap artifacts, and secret display as security-sensitive.
 
 ## Security
 
