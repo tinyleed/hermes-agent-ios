@@ -187,7 +187,7 @@ public struct APNsApprovalNotificationPayload: Codable, Equatable, Sendable {
 
     public init(runId: String, approvalId: String, command: String) {
         self.aps = APS(
-            alert: Alert(title: "Hermes Agent approval required", body: command),
+            alert: Alert(title: "Hermes Agent approval required", body: "A Hermes run is waiting for your response."),
             sound: "default",
             category: "HERMES_AGENT_APPROVAL",
             threadId: runId
@@ -195,6 +195,46 @@ public struct APNsApprovalNotificationPayload: Codable, Equatable, Sendable {
         self.runId = runId
         self.approvalId = approvalId
         self.route = "hermes-agent-ios://approval/\(approvalId)"
+    }
+}
+
+public struct HermesBlockingLocalNotificationPayload: Codable, Equatable, Sendable {
+    public let identifier: String
+    public let title: String
+    public let body: String
+    public let categoryIdentifier: String
+    public let route: String
+    public let requestKind: HermesChatBlockingRequestKind
+    public let sessionId: String?
+
+    public init(request: HermesChatBlockingRequest) {
+        self.identifier = "hermes-agent-blocking-\(request.id)"
+        self.title = request.kind.notificationTitle
+        self.body = "A Hermes run is waiting for your response."
+        self.categoryIdentifier = request.kind.notificationCategoryIdentifier
+        self.route = HermesAgentAppIntentRoute.openNeedsAttention.storageValue
+        self.requestKind = request.kind
+        self.sessionId = request.sessionId
+    }
+
+    public var userInfo: [String: String] {
+        var info = [
+            "route": route,
+            "request_kind": requestKind.rawValue
+        ]
+        if let sessionId, !sessionId.isEmpty {
+            info["session_id"] = sessionId
+        }
+        return info
+    }
+
+    public var isSecretSafeForDisplay: Bool {
+        let joined = [identifier, title, body, categoryIdentifier, route, requestKind.rawValue, sessionId ?? ""].joined(separator: " ").lowercased()
+        return !joined.contains("password=")
+            && !joined.contains("token=")
+            && !joined.contains("secret=")
+            && !joined.contains("authorization")
+            && !joined.contains("bearer")
     }
 }
 
