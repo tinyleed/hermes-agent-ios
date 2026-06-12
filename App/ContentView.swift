@@ -283,7 +283,8 @@ private struct HermesAgentInlineBlockingRequestCard: View {
 
     private var allowsEmptyUITestFixtureResponse: Bool {
         #if DEBUG
-        ProcessInfo.processInfo.environment["HERMES_AGENT_UI_TEST_BLOCKING_FIXTURES"] == "1" && request.sessionId == "session_fixture_cards"
+        let environment = ProcessInfo.processInfo.environment
+        return (environment["HERMES_AGENT_UI_TEST_BLOCKING_FIXTURES"] == "1" && request.sessionId == "session_fixture_cards") || environment["HERMES_AGENT_UI_TEST_MOCK_BLOCKING_GATEWAY_ALLOW_EMPTY_RESPONSE"] == "1"
         #else
         false
         #endif

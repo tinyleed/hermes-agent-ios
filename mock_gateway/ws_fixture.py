@@ -206,6 +206,7 @@ class BlockingFixtureWebSocket:
 
 class BlockingFixtureGatewayHandler(BaseHTTPRequestHandler):
     server_version = "HermesAgentMockGatewayWS/0.1"
+    protocol_version = "HTTP/1.1"
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 - stdlib signature
         return
