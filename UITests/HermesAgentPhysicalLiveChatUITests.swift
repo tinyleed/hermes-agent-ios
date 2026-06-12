@@ -208,6 +208,79 @@ final class HermesAgentPhysicalLiveChatUITests: XCTestCase {
         )
     }
 
+    func testMockGatewayBackedBlockingCardsResumeToRedactedFinalOutput() throws {
+        let app = XCUIApplication()
+        try launchAppWithLiveGateway(app, autosend: true, prompt: "exercise safe blocking cards")
+        app.launchEnvironment["HERMES_AGENT_UI_TEST_RESET_CHAT"] = "1"
+        app.launchEnvironment["HERMES_AGENT_UI_TEST_MOCK_BLOCKING_GATEWAY_ALLOW_EMPTY_RESPONSE"] = "1"
+        app.launch()
+
+        let approvalCard = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Approval required")).firstMatch
+        if !approvalCard.waitForExistence(timeout: 30) {
+            XCTFail("Expected mock gateway approval.request to render. UI: \(app.debugDescription)")
+            return
+        }
+        let approvalButton = app.buttons["Approve"].firstMatch
+        XCTAssertTrue(approvalButton.waitForExistence(timeout: 10), "Expected approval action")
+        approvalButton.tap()
+
+        let sudoCard = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Sudo password required")).firstMatch
+        XCTAssertTrue(sudoCard.waitForExistence(timeout: 30), "Expected mock gateway sudo.request after approval response")
+        app.swipeUp()
+        let sudoButton = app.buttons["Submit Password"].firstMatch
+        XCTAssertTrue(sudoButton.waitForExistence(timeout: 10), "Expected sudo response action")
+        sudoButton.tap()
+
+        let secretCard = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Secret required")).firstMatch
+        XCTAssertTrue(secretCard.waitForExistence(timeout: 30), "Expected mock gateway secret.request after sudo response")
+        let secretButton = app.buttons["Submit Secret"].firstMatch
+        XCTAssertTrue(secretButton.waitForExistence(timeout: 10), "Expected secret response action")
+        secretButton.tap()
+
+        XCTAssertTrue(
+            app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "HERMES_AGENT_MOCK_BLOCKING_GATEWAY_DONE")).firstMatch.waitForExistence(timeout: 30),
+            "Expected mock gateway final output after approval/sudo/secret responses"
+        )
+        XCTAssertFalse(
+            app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "mock-sudo-fixture-password")).firstMatch.exists,
+            "Submitted sudo value must not render in transcript/status"
+        )
+        XCTAssertFalse(
+            app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "mock-secret-fixture-token")).firstMatch.exists,
+            "Submitted secret value must not render in transcript/status"
+        )
+        XCTAssertFalse(
+            app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] %@", "password=")).firstMatch.exists,
+            "Gateway-backed UI must not render password-like values"
+        )
+        XCTAssertFalse(
+            app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] %@", "token=")).firstMatch.exists,
+            "Gateway-backed UI must not render token-like values"
+        )
+    }
+
+    private func enterSecureBlockingValue(_ app: XCUIApplication, value: String) {
+        let secureField = app.secureTextFields["hermes-agent-inline-blocking-secret-field"].firstMatch
+        let textField = app.textFields["hermes-agent-inline-blocking-secret-field"].firstMatch
+        let textView = app.textViews["hermes-agent-inline-blocking-secret-field"].firstMatch
+        let field: XCUIElement
+        if secureField.waitForExistence(timeout: 5) {
+            field = secureField
+        } else if textField.waitForExistence(timeout: 5) {
+            field = textField
+        } else {
+            XCTAssertTrue(textView.waitForExistence(timeout: 5), "Expected secure blocking response field")
+            field = textView
+        }
+        field.tap()
+        field.typeText(value)
+        if app.keyboards.buttons["return"].exists {
+            app.keyboards.buttons["return"].tap()
+        } else {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15)).tap()
+        }
+    }
+
     func testRemoteSessionHistoryCanFetchAndResumeFromOperatorMenu() throws {
         let app = XCUIApplication()
         try launchAppWithLiveGateway(app)
