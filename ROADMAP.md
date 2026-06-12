@@ -5,7 +5,7 @@ Hermes Agent iOS is early-stage. The project prioritizes safe operator control, 
 ## Now
 
 - Stabilize the Hermes gateway-backed chat runtime.
-- Prove approval/sudo/secret request-response loops against safe mock/live gateway fixtures.
+- Extend the proven simulator approval/sudo/secret request-response loop to physical-device verification.
 - Keep simulator-first verification green.
 - Preserve strict secret redaction in transcripts, status text, logs, and bootstrap helpers.
 
