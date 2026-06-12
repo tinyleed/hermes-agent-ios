@@ -110,17 +110,88 @@ public enum NotificationEnrollmentState: String, Codable, Equatable, Sendable {
     }
 }
 
+public enum APNsDeviceTokenRegistrationStatus: String, Codable, Equatable, Sendable {
+    case notRequested
+    case registering
+    case captured
+    case failed
+
+    public var operatorLabel: String {
+        switch self {
+        case .notRequested: return "APNs registration not requested"
+        case .registering: return "APNs registration requested"
+        case .captured: return "APNs device token captured (<redacted>)"
+        case .failed: return "APNs registration failed"
+        }
+    }
+}
+
+public struct APNsDeviceTokenState: Codable, Equatable, Sendable {
+    public let status: APNsDeviceTokenRegistrationStatus
+    public let tokenRedacted: String
+    public let byteCount: Int?
+    public let environment: String
+    public let lastUpdatedAt: Double?
+    public let failureReasonRedacted: String?
+
+    public init(status: APNsDeviceTokenRegistrationStatus = .notRequested, tokenRedacted: String = "<redacted>", byteCount: Int? = nil, environment: String = "development", lastUpdatedAt: Double? = nil, failureReasonRedacted: String? = nil) {
+        self.status = status
+        self.tokenRedacted = tokenRedacted
+        self.byteCount = byteCount
+        self.environment = environment
+        self.lastUpdatedAt = lastUpdatedAt
+        self.failureReasonRedacted = failureReasonRedacted
+    }
+
+    public static func captured(byteCount: Int, environment: String = "development", at timestamp: Double) -> APNsDeviceTokenState {
+        APNsDeviceTokenState(status: .captured, byteCount: byteCount, environment: environment, lastUpdatedAt: timestamp)
+    }
+
+    public static func failed(reason: String, environment: String = "development", at timestamp: Double) -> APNsDeviceTokenState {
+        APNsDeviceTokenState(status: .failed, environment: environment, lastUpdatedAt: timestamp, failureReasonRedacted: APNsDeviceTokenState.redactFailureReason(reason))
+    }
+
+    public var operatorLabel: String {
+        switch status {
+        case .captured:
+            return "APNs device token captured (<redacted> · \(byteCount ?? 0) bytes · \(environment))"
+        case .failed:
+            return "APNs registration failed: \(failureReasonRedacted ?? "<redacted>")"
+        default:
+            return status.operatorLabel
+        }
+    }
+
+    public var isSecretSafeForDisplay: Bool {
+        tokenRedacted == "<redacted>"
+            && !operatorLabel.lowercased().contains("token=")
+            && !operatorLabel.lowercased().contains("bearer")
+            && !operatorLabel.lowercased().contains("authorization")
+    }
+
+    private static func redactFailureReason(_ reason: String) -> String {
+        let trimmed = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "<redacted>" }
+        if trimmed.lowercased().contains("token") || trimmed.lowercased().contains("authorization") || trimmed.lowercased().contains("bearer") {
+            return "<redacted>"
+        }
+        return String(trimmed.prefix(160))
+    }
+}
+
 public struct NotificationReadinessState: Codable, Equatable, Sendable {
     public let enrollment: NotificationEnrollmentState
     public let localPermissionStatus: String
     public let hasRemoteDeviceToken: Bool
     public let lastLocalNotificationAt: Double?
+    public let apnsDeviceTokenState: APNsDeviceTokenState
 
-    public init(enrollment: NotificationEnrollmentState, localPermissionStatus: String, hasRemoteDeviceToken: Bool, lastLocalNotificationAt: Double?) {
+    public init(enrollment: NotificationEnrollmentState, localPermissionStatus: String, hasRemoteDeviceToken: Bool, lastLocalNotificationAt: Double?, apnsDeviceTokenState: APNsDeviceTokenState = APNsDeviceTokenState()) {
         self.enrollment = enrollment
         self.localPermissionStatus = localPermissionStatus
-        self.hasRemoteDeviceToken = hasRemoteDeviceToken
+        self.hasRemoteDeviceToken = hasRemoteDeviceToken || apnsDeviceTokenState.status == .captured
         self.lastLocalNotificationAt = lastLocalNotificationAt
+        self.apnsDeviceTokenState = apnsDeviceTokenState
     }
 
     public var apnsGateLabel: String {
@@ -128,12 +199,16 @@ public struct NotificationReadinessState: Codable, Equatable, Sendable {
         case .personalTeam, .developerProgramRequired:
             return "Push notifications unavailable — Apple Developer Program enrollment required"
         case .developerProgramReady:
-            return hasRemoteDeviceToken ? "APNs device token captured (<redacted>)" : "APNs ready — waiting for device token"
+            return hasRemoteDeviceToken ? apnsDeviceTokenState.operatorLabel : "APNs ready — waiting for device token"
         }
     }
 
     public var localNotificationLabel: String {
         "Local notifications: \(localPermissionStatus)"
+    }
+
+    public var remoteNotificationLabel: String {
+        apnsDeviceTokenState.operatorLabel
     }
 }
 
