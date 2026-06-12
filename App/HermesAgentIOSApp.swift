@@ -17,6 +17,14 @@ final class HermesAgentAppDelegate: NSObject, UIApplicationDelegate, UNUserNotif
     ) async -> UNNotificationPresentationOptions {
         [.banner, .list, .sound]
     }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        guard let route = response.notification.request.content.userInfo["route"] as? String else { return }
+        UserDefaults.standard.set(route, forKey: "pendingAppIntentRoute")
+    }
 }
 
 @main

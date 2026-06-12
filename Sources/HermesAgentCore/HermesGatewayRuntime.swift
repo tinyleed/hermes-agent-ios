@@ -127,6 +127,24 @@ public enum HermesChatBlockingRequestKind: String, Sendable, Equatable, Codable 
         case .secret: return "key.fill"
         }
     }
+
+    public var notificationTitle: String {
+        switch self {
+        case .approval: return "Hermes approval needed"
+        case .clarify: return "Hermes clarification needed"
+        case .sudo: return "Hermes sudo input needed"
+        case .secret: return "Hermes secret input needed"
+        }
+    }
+
+    public var notificationCategoryIdentifier: String {
+        switch self {
+        case .approval: return "HERMES_AGENT_APPROVAL"
+        case .clarify: return "HERMES_AGENT_CLARIFY"
+        case .sudo: return "HERMES_AGENT_SUDO"
+        case .secret: return "HERMES_AGENT_SECRET"
+        }
+    }
 }
 
 public struct HermesChatBlockingRequest: Identifiable, Equatable, Sendable {

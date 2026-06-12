@@ -464,6 +464,7 @@ struct ContentView: View {
     @State private var isResumingRemoteSession = false
     @State private var remoteSessionListError: String?
     @State private var hasFetchedRemoteSessions = false
+    @State private var locallyNotifiedBlockingRequestIds: Set<String> = []
 
     private let eventStreamTimeoutSeconds: UInt64 = 20
 
@@ -1427,17 +1428,22 @@ struct ContentView: View {
             return
         }
 
+        let proofRequest = HermesChatBlockingRequest(
+            id: "local-proof",
+            kind: .approval,
+            sessionId: "local-notification-proof",
+            prompt: "Approve local proof command?",
+            detailRows: ["Command: <redacted>"]
+        )
+        let payload = HermesBlockingLocalNotificationPayload(request: proofRequest)
         let content = UNMutableNotificationContent()
-        content.title = "Hermes Agent approval required"
-        content.body = "Local proof only — real APNs is gated on Apple Developer Program enrollment."
+        content.title = payload.title
+        content.body = payload.body
         content.sound = .default
-        content.categoryIdentifier = "HERMES_AGENT_APPROVAL"
-        content.userInfo = [
-            "route": "hermes-agent-ios://approval/local-proof",
-            "apns_gate": "developer_program_required"
-        ]
+        content.categoryIdentifier = payload.categoryIdentifier
+        content.userInfo = payload.userInfo
         let request = UNNotificationRequest(
-            identifier: "hermes-agent-local-approval-proof-\(Int(Date().timeIntervalSince1970))",
+            identifier: "\(payload.identifier)-\(Int(Date().timeIntervalSince1970))",
             content: content,
             trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         )
@@ -1448,6 +1454,38 @@ struct ContentView: View {
             recordOperatorLog(category: .approvalDecision, title: "Local approval notification", detail: "Scheduled local notification proof with foreground banner/list presentation; APNs remains gated on Developer Program enrollment", runId: "local-notification-proof")
         } catch {
             lastStatus = "Local approval notification failed: \(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func scheduleLocalNotificationIfAuthorized(for request: HermesChatBlockingRequest) async {
+        guard !locallyNotifiedBlockingRequestIds.contains(request.id) else { return }
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        notificationPermissionStatus = settings.authorizationStatus.operatorLabel
+        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional || settings.authorizationStatus == .ephemeral else {
+            return
+        }
+
+        let payload = HermesBlockingLocalNotificationPayload(request: request)
+        guard payload.isSecretSafeForDisplay else {
+            recordOperatorLog(category: .approvalDecision, title: "Local blocking notification skipped", detail: "Skipped unsafe notification payload", runId: request.sessionId)
+            return
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = payload.title
+        content.body = payload.body
+        content.sound = .default
+        content.categoryIdentifier = payload.categoryIdentifier
+        content.userInfo = payload.userInfo
+        let notificationRequest = UNNotificationRequest(identifier: payload.identifier, content: content, trigger: nil)
+        do {
+            try await UNUserNotificationCenter.current().add(notificationRequest)
+            locallyNotifiedBlockingRequestIds.insert(request.id)
+            lastLocalApprovalNotificationAt = Date().timeIntervalSince1970
+            recordOperatorLog(category: .approvalDecision, title: "Local blocking notification", detail: "Scheduled redacted local notification for \(request.kind.title)", runId: request.sessionId)
+        } catch {
+            lastStatus = "Local blocking notification failed: \(error.localizedDescription)"
         }
     }
 
@@ -1927,6 +1965,7 @@ struct ContentView: View {
                 upsertBlockingRequestChatLine(request)
                 replacePendingAssistantChatLine(with: "Waiting for operator input…", isPending: true)
                 lastStatus = request.kind.title
+                Task { await scheduleLocalNotificationIfAuthorized(for: request) }
             }
         }
         if !hermesRuntimeState.assistantText.isEmpty {

@@ -305,14 +305,34 @@ do {
     expect(readiness.apnsGateLabel.contains("Apple Developer Program enrollment required"), "Personal Team notification readiness should expose the APNs enrollment gate")
     expect(readiness.localNotificationLabel == "Local notifications: authorized", "local notification permission state should be operator-readable")
 
-    let apnsPayload = APNsApprovalNotificationPayload(runId: "run_live_abc", approvalId: "approval_123", command: "Review terminal command")
+    let apnsPayload = APNsApprovalNotificationPayload(runId: "run_live_abc", approvalId: "approval_123", command: "Review terminal command token=SECRET")
     let apnsEncoded = try JSONEncoder.hermesAgentGateway.encode(apnsPayload)
+    let apnsString = String(data: apnsEncoded, encoding: .utf8)!
     let apnsJSON = try JSONSerialization.jsonObject(with: apnsEncoded) as? [String: Any]
     let apsJSON = apnsJSON?["aps"] as? [String: Any]
     let alertJSON = apsJSON?["alert"] as? [String: Any]
     expect(alertJSON?["title"] as? String == "Hermes Agent approval required", "APNs approval payload should carry approval title")
+    expect(alertJSON?["body"] as? String == "A Hermes run is waiting for your response.", "APNs approval payload should use a redacted attention-only body")
     expect(apnsJSON?["route"] as? String == "hermes-agent-ios://approval/approval_123", "APNs payload should carry app route without secrets")
-    expect(!String(data: apnsEncoded, encoding: .utf8)!.contains("secret"), "APNs payload skeleton must not include secrets")
+    expect(!apnsString.contains("token=SECRET"), "APNs payload must not include raw command/token material")
+    expect(!apnsString.contains("secret"), "APNs payload skeleton must not include secrets")
+
+    let blockingNotificationRequest = HermesChatBlockingRequest(
+        id: "secret-notification-1",
+        kind: .secret,
+        sessionId: "session-notify",
+        prompt: "Enter token=SHOULD_NOT_RENDER",
+        detailRows: ["Variable: API_TOKEN", "Command: export token=SHOULD_NOT_RENDER"]
+    )
+    let blockingNotification = HermesBlockingLocalNotificationPayload(request: blockingNotificationRequest)
+    let blockingNotificationJSON = try JSONEncoder.hermesAgentGateway.encode(blockingNotification)
+    let blockingNotificationString = String(data: blockingNotificationJSON, encoding: .utf8)!
+    expect(blockingNotification.title == "Hermes secret input needed", "Local blocking notification should identify request kind generically")
+    expect(blockingNotification.body == "A Hermes run is waiting for your response.", "Local blocking notification should use redacted generic body")
+    expect(blockingNotification.categoryIdentifier == "HERMES_AGENT_SECRET", "Local blocking notification should carry request category")
+    expect(blockingNotification.userInfo["route"] == HermesAgentAppIntentRoute.openNeedsAttention.storageValue, "Local blocking notification tap route should reopen needs-attention surface")
+    expect(blockingNotification.isSecretSafeForDisplay, "Local blocking notification payload should be display-safe")
+    expect(!blockingNotificationString.contains("SHOULD_NOT_RENDER"), "Local blocking notification must not encode prompt/detail secret material")
 
     MockURLProtocol.requestHandler = { request in
         expect(request.httpMethod == "POST", "client should POST command")
