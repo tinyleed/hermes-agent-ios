@@ -425,6 +425,11 @@ struct ContentView: View {
     @AppStorage("approvalAuditJSON") private var approvalAuditJSON = "[]"
     @AppStorage("operatorLogJSON") private var operatorLogJSON = "[]"
     @AppStorage("notificationPermissionStatus") private var notificationPermissionStatus = "not requested"
+    @AppStorage("notificationEnrollmentState") private var notificationEnrollmentState = NotificationEnrollmentState.developerProgramReady.rawValue
+    @AppStorage("apnsRegistrationStatus") private var apnsRegistrationStatus = APNsDeviceTokenRegistrationStatus.notRequested.rawValue
+    @AppStorage("apnsDeviceTokenByteCount") private var apnsDeviceTokenByteCount = 0
+    @AppStorage("apnsRegistrationUpdatedAt") private var apnsRegistrationUpdatedAt = 0.0
+    @AppStorage("apnsRegistrationFailureRedacted") private var apnsRegistrationFailureRedacted = ""
     @AppStorage("lastLocalApprovalNotificationAt") private var lastLocalApprovalNotificationAt = 0.0
     @AppStorage("pendingAppIntentRoute") private var pendingAppIntentRoute = ""
     @AppStorage("lastShareExtensionHandoff") private var lastShareExtensionHandoff = ""
@@ -626,11 +631,21 @@ struct ContentView: View {
     }
 
     private var notificationReadiness: NotificationReadinessState {
-        NotificationReadinessState(
-            enrollment: .personalTeam,
+        let tokenStatus = APNsDeviceTokenRegistrationStatus(rawValue: apnsRegistrationStatus) ?? .notRequested
+        let enrollment = NotificationEnrollmentState(rawValue: notificationEnrollmentState) ?? .developerProgramReady
+        let tokenState = APNsDeviceTokenState(
+            status: tokenStatus,
+            byteCount: apnsDeviceTokenByteCount > 0 ? apnsDeviceTokenByteCount : nil,
+            environment: "development",
+            lastUpdatedAt: apnsRegistrationUpdatedAt > 0 ? apnsRegistrationUpdatedAt : nil,
+            failureReasonRedacted: apnsRegistrationFailureRedacted.isEmpty ? nil : apnsRegistrationFailureRedacted
+        )
+        return NotificationReadinessState(
+            enrollment: enrollment,
             localPermissionStatus: notificationPermissionStatus,
-            hasRemoteDeviceToken: false,
-            lastLocalNotificationAt: lastLocalApprovalNotificationAt > 0 ? lastLocalApprovalNotificationAt : nil
+            hasRemoteDeviceToken: tokenStatus == .captured,
+            lastLocalNotificationAt: lastLocalApprovalNotificationAt > 0 ? lastLocalApprovalNotificationAt : nil,
+            apnsDeviceTokenState: tokenState
         )
     }
 
@@ -1004,6 +1019,22 @@ struct ContentView: View {
                                             .disabled(isWorking || normalizedHermesBearerToken == nil)
                                         Button("Run Live Approval Smoke") { Task { await submitHermesApprovalSmokeRun() } }
                                             .disabled(isWorking || normalizedHermesBearerToken == nil)
+                                    }
+                                    Section("Notification Readiness") {
+                                        Label(notificationReadiness.apnsGateLabel, systemImage: notificationReadiness.hasRemoteDeviceToken ? "checkmark.seal" : "antenna.radiowaves.left.and.right")
+                                        Text(notificationReadiness.localNotificationLabel)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        Text(notificationReadiness.remoteNotificationLabel)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        Text(lastLocalNotificationLabel)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        Button("Request Local Notification Permission") { Task { await requestLocalNotificationPermission() } }
+                                        Button("Register for Remote Notifications") { Task { await registerForRemoteNotificationsIfPossible() } }
+                                            .disabled(notificationPermissionStatus != "authorized" && notificationPermissionStatus != "provisional" && notificationPermissionStatus != "ephemeral")
+                                        Button("Run Local Approval Notification") { Task { await runLocalApprovalNotificationProof() } }
                                     }
                                     Section("Advanced · Physical Device Debug") {
                                         Text(physicalDeviceDiagnostics.handoffStateLabel)
@@ -1413,6 +1444,22 @@ struct ContentView: View {
         } catch {
             notificationPermissionStatus = "failed: \(error.localizedDescription)"
         }
+    }
+
+    @MainActor
+    private func registerForRemoteNotificationsIfPossible() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        notificationPermissionStatus = settings.authorizationStatus.operatorLabel
+        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional || settings.authorizationStatus == .ephemeral else {
+            lastStatus = "Remote notification registration not requested: permission \(notificationPermissionStatus)"
+            return
+        }
+        apnsRegistrationStatus = APNsDeviceTokenRegistrationStatus.registering.rawValue
+        apnsRegistrationUpdatedAt = Date().timeIntervalSince1970
+        apnsRegistrationFailureRedacted = ""
+        lastStatus = "Remote notification registration requested"
+        recordOperatorLog(category: .capabilityCheck, title: "APNs registration", detail: "Requested remote notification registration; token remains redacted", runId: nil)
+        UIApplication.shared.registerForRemoteNotifications()
     }
 
     @MainActor

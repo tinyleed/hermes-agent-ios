@@ -301,9 +301,21 @@ do {
     expect(tokenJSON?["tokenRedacted"] as? String == "<redacted>", "notification registration must only carry redacted token state")
     expect(tokenJSON?["enrolledDeveloperProgram"] as? Bool == false, "Personal Team lane should explicitly mark Developer Program as absent")
 
-    let readiness = NotificationReadinessState(enrollment: .personalTeam, localPermissionStatus: "authorized", hasRemoteDeviceToken: false, lastLocalNotificationAt: 1780477200.0)
-    expect(readiness.apnsGateLabel.contains("Apple Developer Program enrollment required"), "Personal Team notification readiness should expose the APNs enrollment gate")
+    let capturedTokenState = APNsDeviceTokenState.captured(byteCount: 32, at: 1780477300.0)
+    expect(capturedTokenState.tokenRedacted == "<redacted>", "APNs token state must never expose raw token material")
+    expect(capturedTokenState.operatorLabel.contains("<redacted>"), "APNs token operator label should be redacted")
+    expect(capturedTokenState.operatorLabel.contains("32 bytes"), "APNs token operator label should expose safe byte-count metadata")
+    expect(capturedTokenState.isSecretSafeForDisplay, "APNs captured token state should be display-safe")
+    let failedTokenState = APNsDeviceTokenState.failed(reason: "authorization bearer token=SHOULD_NOT_RENDER", at: 1780477400.0)
+    expect(failedTokenState.failureReasonRedacted == "<redacted>", "APNs failure reason should redact token-like material")
+    expect(!failedTokenState.operatorLabel.contains("SHOULD_NOT_RENDER"), "APNs failure label must not expose secret-like material")
+
+    let readiness = NotificationReadinessState(enrollment: .developerProgramReady, localPermissionStatus: "authorized", hasRemoteDeviceToken: false, lastLocalNotificationAt: 1780477200.0, apnsDeviceTokenState: capturedTokenState)
+    expect(readiness.apnsGateLabel.contains("APNs device token captured (<redacted>"), "Developer Program readiness should expose redacted APNs token state")
     expect(readiness.localNotificationLabel == "Local notifications: authorized", "local notification permission state should be operator-readable")
+    expect(readiness.remoteNotificationLabel.contains("<redacted>"), "remote notification state should remain redacted")
+    let gatedReadiness = NotificationReadinessState(enrollment: .personalTeam, localPermissionStatus: "authorized", hasRemoteDeviceToken: false, lastLocalNotificationAt: nil)
+    expect(gatedReadiness.apnsGateLabel.contains("Apple Developer Program enrollment required"), "Personal Team notification readiness should still expose the APNs enrollment gate")
 
     let apnsPayload = APNsApprovalNotificationPayload(runId: "run_live_abc", approvalId: "approval_123", command: "Review terminal command token=SECRET")
     let apnsEncoded = try JSONEncoder.hermesAgentGateway.encode(apnsPayload)

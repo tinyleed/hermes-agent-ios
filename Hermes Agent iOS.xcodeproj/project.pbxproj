@@ -73,6 +73,7 @@
 		682A041718C0AC1E3113C5AD /* HermesAgentIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesAgentIOSApp.swift; sourceTree = "<group>"; };
 		7513FE36E30B1BAD0D7F0D3F /* hermes-agent-ios */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "hermes-agent-ios"; path = .; sourceTree = SOURCE_ROOT; };
 		85BDAFB05E83DD94ED39B7FA /* Hermes Agent Share Extension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = "Hermes Agent Share Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		8DBDE452382AA07AFD433579 /* HermesAgent.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HermesAgent.entitlements; sourceTree = "<group>"; };
 		94A3E0C861A720C6BB83358D /* HermesAgentAppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesAgentAppIntents.swift; sourceTree = "<group>"; };
 		AB9E27F2E12FC628531C7DC6 /* HermesAgentPhysicalLiveChatUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesAgentPhysicalLiveChatUITests.swift; sourceTree = "<group>"; };
 		BC1DF396AAEF68FD0CEB30D9 /* Hermes Agent iOS UI Tests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = "Hermes Agent iOS UI Tests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -173,6 +174,7 @@
 				2E5DD8D6231C4181F43A70E9 /* Assets.xcassets */,
 				34ECD9942E33F2CBEE914BB6 /* ContentView.swift */,
 				0FA060DAB28506F3AF01BD62 /* GatewaySettings.swift */,
+				8DBDE452382AA07AFD433579 /* HermesAgent.entitlements */,
 				94A3E0C861A720C6BB83358D /* HermesAgentAppIntents.swift */,
 				682A041718C0AC1E3113C5AD /* HermesAgentIOSApp.swift */,
 				4558B5A81DA251B2EF02B9FB /* Info.plist */,
@@ -470,6 +472,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/HermesAgent.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -604,6 +607,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/HermesAgent.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = App/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
