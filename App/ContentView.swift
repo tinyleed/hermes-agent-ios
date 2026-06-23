@@ -430,6 +430,10 @@ struct ContentView: View {
     @AppStorage("apnsDeviceTokenByteCount") private var apnsDeviceTokenByteCount = 0
     @AppStorage("apnsRegistrationUpdatedAt") private var apnsRegistrationUpdatedAt = 0.0
     @AppStorage("apnsRegistrationFailureRedacted") private var apnsRegistrationFailureRedacted = ""
+    @AppStorage("apnsDeviceRegistrationId") private var apnsDeviceRegistrationId = ""
+    @AppStorage("apnsDeviceRegistrationGate") private var apnsDeviceRegistrationGate = ""
+    @AppStorage("apnsDeviceRegistrationUpdatedAt") private var apnsDeviceRegistrationUpdatedAt = 0.0
+    @AppStorage("hermesAgentDeviceId") private var hermesAgentDeviceId = ""
     @AppStorage("lastLocalApprovalNotificationAt") private var lastLocalApprovalNotificationAt = 0.0
     @AppStorage("pendingAppIntentRoute") private var pendingAppIntentRoute = ""
     @AppStorage("lastShareExtensionHandoff") private var lastShareExtensionHandoff = ""
@@ -646,6 +650,49 @@ struct ContentView: View {
             hasRemoteDeviceToken: tokenStatus == .captured,
             lastLocalNotificationAt: lastLocalApprovalNotificationAt > 0 ? lastLocalApprovalNotificationAt : nil,
             apnsDeviceTokenState: tokenState
+        )
+    }
+
+    private var apnsGatewayRegistrationLabel: String {
+        guard !apnsDeviceRegistrationId.isEmpty else {
+            return "Gateway APNs device registration: not synced"
+        }
+        let gate = APNsDeviceRegistrationGate(rawValue: apnsDeviceRegistrationGate)?.operatorLabel ?? "APNs registration gate unknown"
+        return "Gateway APNs device registration: \(gate) · <redacted>"
+    }
+
+    private var stableHermesDeviceId: String {
+        if !hermesAgentDeviceId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return hermesAgentDeviceId
+        }
+        let generated = "ios-\(UUID().uuidString.lowercased())"
+        hermesAgentDeviceId = generated
+        return generated
+    }
+
+    private var appVersionLabel: String? {
+        let info = Bundle.main.infoDictionary
+        let version = (info?["CFBundleShortVersionString"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let build = (info?["CFBundleVersion"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch (version?.isEmpty == false ? version : nil, build?.isEmpty == false ? build : nil) {
+        case let (version?, build?): return "\(version) (\(build))"
+        case let (version?, nil): return version
+        case let (nil, build?): return build
+        default: return nil
+        }
+    }
+
+    private func makeAPNsDeviceRegistrationRequest() -> APNsDeviceRegistrationRequest? {
+        let tokenStatus = APNsDeviceTokenRegistrationStatus(rawValue: apnsRegistrationStatus) ?? .notRequested
+        guard tokenStatus == .captured, apnsDeviceTokenByteCount > 0 else { return nil }
+        let enrollment = NotificationEnrollmentState(rawValue: notificationEnrollmentState) ?? .developerProgramReady
+        return APNsDeviceRegistrationRequest.capturedDeviceToken(
+            deviceId: stableHermesDeviceId,
+            byteCount: apnsDeviceTokenByteCount,
+            environment: "development",
+            bundleIdentifier: Bundle.main.bundleIdentifier ?? "com.tinyleed.hermes-agent-ios",
+            appVersion: appVersionLabel,
+            enrolledDeveloperProgram: enrollment == .developerProgramReady
         )
     }
 
@@ -1028,6 +1075,9 @@ struct ContentView: View {
                                         Text(notificationReadiness.remoteNotificationLabel)
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
+                                        Text(apnsGatewayRegistrationLabel)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
                                         Text(lastLocalNotificationLabel)
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
@@ -1094,9 +1144,14 @@ struct ContentView: View {
                 applyPendingAppIntentRoute()
                 applyUITestOverrides()
                 Task { await refreshNonTerminalHermesRunCards() }
+                Task { await syncCapturedAPNsDeviceRegistrationIfPossible(reason: "app launch") }
             }
             .onChange(of: pendingAppIntentRoute) { _, _ in
                 applyPendingAppIntentRoute()
+            }
+            .onChange(of: apnsRegistrationStatus) { _, status in
+                guard status == APNsDeviceTokenRegistrationStatus.captured.rawValue else { return }
+                Task { await syncCapturedAPNsDeviceRegistrationIfPossible(reason: "device token captured") }
             }
         }
     }
@@ -1457,9 +1512,42 @@ struct ContentView: View {
         apnsRegistrationStatus = APNsDeviceTokenRegistrationStatus.registering.rawValue
         apnsRegistrationUpdatedAt = Date().timeIntervalSince1970
         apnsRegistrationFailureRedacted = ""
+        apnsDeviceRegistrationId = ""
+        apnsDeviceRegistrationGate = ""
         lastStatus = "Remote notification registration requested"
         recordOperatorLog(category: .capabilityCheck, title: "APNs registration", detail: "Requested remote notification registration; token remains redacted", runId: nil)
         UIApplication.shared.registerForRemoteNotifications()
+    }
+
+    @MainActor
+    private func syncCapturedAPNsDeviceRegistrationIfPossible(reason: String) async {
+        guard let payload = makeAPNsDeviceRegistrationRequest() else { return }
+        guard payload.isSecretSafeForDisplay else {
+            lastStatus = "APNs gateway registration skipped: unsafe device metadata"
+            recordOperatorLog(category: .capabilityCheck, title: "APNs gateway registration", detail: "Skipped unsafe APNs registration payload", runId: nil)
+            return
+        }
+        guard apnsDeviceRegistrationId.isEmpty || apnsDeviceRegistrationGate != APNsDeviceRegistrationGate.ready.rawValue else { return }
+
+        do {
+            let response = try await gatewayClient.registerAPNsDevice(payload)
+            apnsDeviceRegistrationId = response.registration.id
+            apnsDeviceRegistrationGate = response.apnsGate.rawValue
+            apnsDeviceRegistrationUpdatedAt = Date().timeIntervalSince1970
+            lastStatus = response.apnsGate == .ready
+                ? "APNs device registered with gateway (<redacted>)"
+                : response.apnsGate.operatorLabel
+            recordOperatorLog(
+                category: .capabilityCheck,
+                title: "APNs gateway registration",
+                detail: "Synced redacted APNs device registration after \(reason): \(response.apnsGate.operatorLabel)",
+                runId: nil
+            )
+        } catch {
+            apnsDeviceRegistrationUpdatedAt = Date().timeIntervalSince1970
+            lastStatus = "APNs gateway registration failed: \(error.localizedDescription)"
+            recordOperatorLog(category: .capabilityCheck, title: "APNs gateway registration", detail: "Failed redacted APNs registration sync: \(error.localizedDescription)", runId: nil)
+        }
     }
 
     @MainActor

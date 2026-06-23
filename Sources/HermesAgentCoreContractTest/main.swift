@@ -312,6 +312,23 @@ do {
     expect(apnsRegistrationPayload.tokenRedacted == "<redacted>", "APNs device registration request must normalize raw token material to redacted state")
     expect(apnsRegistrationPayload.apnsAvailable, "Developer Program registration with device metadata should be APNs-ready")
     expect(apnsRegistrationPayload.isSecretSafeForDisplay, "APNs device registration request should be display-safe")
+    let capturedAPNsRegistrationPayload = APNsDeviceRegistrationRequest.capturedDeviceToken(
+        deviceId: "iphone-local",
+        byteCount: 32,
+        bundleIdentifier: "com.tinyleed.HermesAgentIOS",
+        appVersion: "0.1.0",
+        enrolledDeveloperProgram: true
+    )
+    expect(capturedAPNsRegistrationPayload.tokenRedacted == "<redacted>", "Captured APNs device-token request should only carry redacted token state")
+    expect(capturedAPNsRegistrationPayload.apnsAvailable, "Captured APNs device-token request should be available when metadata and Developer Program are present")
+    expect(capturedAPNsRegistrationPayload.isSecretSafeForDisplay, "Captured APNs device-token request should be display-safe")
+    let emptyCapturedAPNsRegistrationPayload = APNsDeviceRegistrationRequest.capturedDeviceToken(
+        deviceId: "iphone-local",
+        byteCount: 0,
+        bundleIdentifier: "com.tinyleed.HermesAgentIOS",
+        enrolledDeveloperProgram: true
+    )
+    expect(!emptyCapturedAPNsRegistrationPayload.apnsAvailable, "Captured APNs registration should remain gated without a token byte count")
     let apnsRegistrationEndpoint = GatewayEndpoint.registerAPNsDevice(apnsRegistrationPayload)
     let apnsRegistrationRequest = try apnsRegistrationEndpoint.urlRequest(baseURL: URL(string: "http://127.0.0.1:8787")!)
     expect(apnsRegistrationRequest.httpMethod == "POST", "APNs device registration should be POST")
