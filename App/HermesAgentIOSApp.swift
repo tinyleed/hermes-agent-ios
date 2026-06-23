@@ -33,6 +33,8 @@ final class HermesAgentAppDelegate: NSObject, UIApplicationDelegate, UNUserNotif
         defaults.set(deviceToken.count, forKey: "apnsDeviceTokenByteCount")
         defaults.set(Date().timeIntervalSince1970, forKey: "apnsRegistrationUpdatedAt")
         defaults.set("", forKey: "apnsRegistrationFailureRedacted")
+        defaults.set("", forKey: "apnsDeviceRegistrationId")
+        defaults.set("", forKey: "apnsDeviceRegistrationGate")
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {

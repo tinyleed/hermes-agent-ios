@@ -247,6 +247,24 @@ public struct APNsDeviceRegistrationRequest: Codable, Equatable, Sendable {
         self.enrolledDeveloperProgram = enrolledDeveloperProgram
     }
 
+    public static func capturedDeviceToken(
+        deviceId: String,
+        byteCount: Int,
+        environment: String = "development",
+        bundleIdentifier: String,
+        appVersion: String? = nil,
+        enrolledDeveloperProgram: Bool
+    ) -> APNsDeviceRegistrationRequest {
+        APNsDeviceRegistrationRequest(
+            deviceId: deviceId,
+            tokenRedacted: "<redacted>",
+            environment: environment,
+            bundleIdentifier: bundleIdentifier,
+            appVersion: appVersion,
+            enrolledDeveloperProgram: enrolledDeveloperProgram && byteCount > 0
+        )
+    }
+
     public var apnsAvailable: Bool {
         enrolledDeveloperProgram && !deviceId.isEmpty && !bundleIdentifier.isEmpty
     }
