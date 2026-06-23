@@ -228,6 +228,101 @@ public struct NotificationTokenRegistrationPayload: Encodable, Equatable, Sendab
     }
 }
 
+public struct APNsDeviceRegistrationRequest: Codable, Equatable, Sendable {
+    public let deviceId: String
+    public let platform: String
+    public let tokenRedacted: String
+    public let environment: String
+    public let bundleIdentifier: String
+    public let appVersion: String?
+    public let enrolledDeveloperProgram: Bool
+
+    public init(deviceId: String, platform: String = "ios", tokenRedacted: String = "<redacted>", environment: String = "development", bundleIdentifier: String, appVersion: String? = nil, enrolledDeveloperProgram: Bool) {
+        self.deviceId = deviceId.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.platform = platform.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "ios"
+        self.tokenRedacted = tokenRedacted == "<redacted>" ? "<redacted>" : "<redacted>"
+        self.environment = environment.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "development"
+        self.bundleIdentifier = bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.appVersion = appVersion?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.enrolledDeveloperProgram = enrolledDeveloperProgram
+    }
+
+    public var apnsAvailable: Bool {
+        enrolledDeveloperProgram && !deviceId.isEmpty && !bundleIdentifier.isEmpty
+    }
+
+    public var isSecretSafeForDisplay: Bool {
+        tokenRedacted == "<redacted>"
+            && !deviceId.lowercased().contains("token=")
+            && !bundleIdentifier.lowercased().contains("token=")
+    }
+}
+
+public struct APNsDeviceRegistrationResponse: Codable, Equatable, Sendable {
+    public let registration: APNsDeviceRegistration
+    public let apnsGate: APNsDeviceRegistrationGate
+
+    public init(registration: APNsDeviceRegistration, apnsGate: APNsDeviceRegistrationGate) {
+        self.registration = registration
+        self.apnsGate = apnsGate
+    }
+}
+
+public struct APNsDeviceRegistration: Codable, Equatable, Sendable {
+    public let id: String
+    public let deviceId: String
+    public let platform: String
+    public let environment: String
+    public let tokenState: String
+    public let bundleIdentifier: String
+    public let appVersion: String?
+    public let apnsAvailable: Bool
+    public let createdAt: Date
+
+    public init(id: String, deviceId: String, platform: String, environment: String, tokenState: String, bundleIdentifier: String, appVersion: String?, apnsAvailable: Bool, createdAt: Date) {
+        self.id = id
+        self.deviceId = deviceId
+        self.platform = platform
+        self.environment = environment
+        self.tokenState = tokenState
+        self.bundleIdentifier = bundleIdentifier
+        self.appVersion = appVersion
+        self.apnsAvailable = apnsAvailable
+        self.createdAt = createdAt
+    }
+
+    public var operatorLabel: String {
+        apnsAvailable
+            ? "APNs device registration ready (\(environment) · <redacted>)"
+            : "APNs device registration gated — Developer Program required"
+    }
+
+    public var isSecretSafeForDisplay: Bool {
+        let joined = [id, deviceId, platform, environment, tokenState, bundleIdentifier, appVersion ?? "", operatorLabel].joined(separator: " ").lowercased()
+        return !joined.contains("token=")
+            && !joined.contains("bearer")
+            && !joined.contains("authorization")
+            && !joined.contains("secret=")
+    }
+}
+
+public enum APNsDeviceRegistrationGate: String, Codable, Equatable, Sendable {
+    case ready
+    case developerProgramRequired = "developer_program_required"
+    case invalidRequest = "invalid_request"
+
+    public var operatorLabel: String {
+        switch self {
+        case .ready:
+            return "APNs registration ready"
+        case .developerProgramRequired:
+            return "Apple Developer Program required before APNs registration can be used"
+        case .invalidRequest:
+            return "APNs registration request is missing required device metadata"
+        }
+    }
+}
+
 public struct APNsApprovalNotificationPayload: Codable, Equatable, Sendable {
     public let aps: APS
     public let runId: String
@@ -331,6 +426,7 @@ public enum GatewayEndpoint: Sendable {
     case pendingApprovals
     case threadMessages(threadId: String)
     case registerNotificationToken(NotificationTokenRegistrationPayload)
+    case registerAPNsDevice(APNsDeviceRegistrationRequest)
 
     public func urlRequest(baseURL: URL) throws -> URLRequest {
         let path: String
@@ -356,6 +452,10 @@ public enum GatewayEndpoint: Sendable {
             body = nil
         case .registerNotificationToken(let payload):
             path = "/v0/notification-tokens"
+            method = "POST"
+            body = try JSONEncoder.hermesAgentGateway.encode(payload)
+        case .registerAPNsDevice(let payload):
+            path = "/v0/apns/device-registrations"
             method = "POST"
             body = try JSONEncoder.hermesAgentGateway.encode(payload)
         }
@@ -1550,6 +1650,11 @@ public struct GatewayClient: Sendable {
     public func fetchThreadMessages(threadId: String) async throws -> ThreadMessagesResponse {
         let request = try GatewayEndpoint.threadMessages(threadId: threadId).urlRequest(baseURL: baseURL)
         return try await perform(request, as: ThreadMessagesResponse.self, acceptableStatusCodes: 200..<300)
+    }
+
+    public func registerAPNsDevice(_ payload: APNsDeviceRegistrationRequest) async throws -> APNsDeviceRegistrationResponse {
+        let request = try GatewayEndpoint.registerAPNsDevice(payload).urlRequest(baseURL: baseURL)
+        return try await perform(request, as: APNsDeviceRegistrationResponse.self, acceptableStatusCodes: 200..<300)
     }
 
     private func perform<Response: Decodable>(_ request: URLRequest, as responseType: Response.Type, acceptableStatusCodes: Range<Int>) async throws -> Response {
