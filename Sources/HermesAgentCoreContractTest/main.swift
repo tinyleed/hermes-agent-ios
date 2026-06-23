@@ -301,6 +301,47 @@ do {
     expect(tokenJSON?["tokenRedacted"] as? String == "<redacted>", "notification registration must only carry redacted token state")
     expect(tokenJSON?["enrolledDeveloperProgram"] as? Bool == false, "Personal Team lane should explicitly mark Developer Program as absent")
 
+    let apnsRegistrationPayload = APNsDeviceRegistrationRequest(
+        deviceId: "iphone-local",
+        tokenRedacted: "raw-token-SHOULD_NOT_RENDER",
+        environment: "development",
+        bundleIdentifier: "com.tinyleed.HermesAgentIOS",
+        appVersion: "0.1.0",
+        enrolledDeveloperProgram: true
+    )
+    expect(apnsRegistrationPayload.tokenRedacted == "<redacted>", "APNs device registration request must normalize raw token material to redacted state")
+    expect(apnsRegistrationPayload.apnsAvailable, "Developer Program registration with device metadata should be APNs-ready")
+    expect(apnsRegistrationPayload.isSecretSafeForDisplay, "APNs device registration request should be display-safe")
+    let apnsRegistrationEndpoint = GatewayEndpoint.registerAPNsDevice(apnsRegistrationPayload)
+    let apnsRegistrationRequest = try apnsRegistrationEndpoint.urlRequest(baseURL: URL(string: "http://127.0.0.1:8787")!)
+    expect(apnsRegistrationRequest.httpMethod == "POST", "APNs device registration should be POST")
+    expect(apnsRegistrationRequest.url?.path == "/v0/apns/device-registrations", "APNs device registration path should match gateway contract")
+    let apnsRegistrationJSON = try JSONSerialization.jsonObject(with: apnsRegistrationRequest.httpBody ?? Data()) as? [String: Any]
+    expect(apnsRegistrationJSON?["tokenRedacted"] as? String == "<redacted>", "APNs device registration must only send redacted token state")
+    expect(apnsRegistrationJSON?["bundleIdentifier"] as? String == "com.tinyleed.HermesAgentIOS", "APNs device registration should identify the app bundle")
+    expect(!(String(data: apnsRegistrationRequest.httpBody ?? Data(), encoding: .utf8) ?? "").contains("SHOULD_NOT_RENDER"), "APNs device registration body must not encode raw token material")
+
+    let apnsRegistrationResponse = APNsDeviceRegistrationResponse(
+        registration: APNsDeviceRegistration(
+            id: "apns_device_registration_abc",
+            deviceId: "iphone-local",
+            platform: "ios",
+            environment: "development",
+            tokenState: "redacted_present",
+            bundleIdentifier: "com.tinyleed.HermesAgentIOS",
+            appVersion: "0.1.0",
+            apnsAvailable: true,
+            createdAt: Date(timeIntervalSince1970: 1780477500.0)
+        ),
+        apnsGate: .ready
+    )
+    let encodedRegistrationResponse = try JSONEncoder.hermesAgentGateway.encode(apnsRegistrationResponse)
+    let decodedRegistrationResponse = try JSONDecoder.hermesAgentGateway.decode(APNsDeviceRegistrationResponse.self, from: encodedRegistrationResponse)
+    expect(decodedRegistrationResponse == apnsRegistrationResponse, "APNs device registration response should round-trip through JSON")
+    expect(decodedRegistrationResponse.registration.operatorLabel.contains("<redacted>"), "APNs device registration operator label should remain redacted")
+    expect(decodedRegistrationResponse.registration.isSecretSafeForDisplay, "APNs device registration response should be display-safe")
+    expect(APNsDeviceRegistrationGate.developerProgramRequired.operatorLabel.contains("Developer Program"), "APNs gate should explain Developer Program requirement")
+
     let capturedTokenState = APNsDeviceTokenState.captured(byteCount: 32, at: 1780477300.0)
     expect(capturedTokenState.tokenRedacted == "<redacted>", "APNs token state must never expose raw token material")
     expect(capturedTokenState.operatorLabel.contains("<redacted>"), "APNs token operator label should be redacted")
@@ -385,6 +426,18 @@ do {
     }
     let refreshedHistory = try await client.fetchThreadMessages(threadId: "thread_abc")
     expect(refreshedHistory.messages.last?.kind == "command_result", "client should decode refreshed thread history")
+
+    MockURLProtocol.requestHandler = { request in
+        expect(request.httpMethod == "POST", "client should POST APNs device registration")
+        expect(request.url?.path == "/v0/apns/device-registrations", "client should hit APNs device registration endpoint")
+        let requestBody = String(data: request.httpBody ?? Data(), encoding: .utf8) ?? ""
+        expect(!requestBody.contains("SHOULD_NOT_RENDER"), "client APNs registration request must not send raw token material")
+        let response = HTTPURLResponse(url: request.url!, statusCode: 202, httpVersion: nil, headerFields: nil)!
+        return (response, encodedRegistrationResponse)
+    }
+    let registeredAPNsDevice = try await client.registerAPNsDevice(apnsRegistrationPayload)
+    expect(registeredAPNsDevice.apnsGate == .ready, "client should decode APNs device registration gate")
+    expect(registeredAPNsDevice.registration.tokenState == "redacted_present", "client should decode redacted token state")
 
     let capabilities = try JSONDecoder.hermesAgentGateway.decode(HermesAPICapabilities.self, from: hermesCapabilitiesJSON)
     expect(capabilities.platform == "hermes-agent", "Hermes capabilities should decode platform")

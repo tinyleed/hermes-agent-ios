@@ -45,6 +45,12 @@ def make_server(address: tuple[str, int], state: GatewayState | None = None) -> 
                 self._send_json(202, gateway_state.register_notification_token(request))
                 return
 
+            if path == "/v0/apns/device-registrations":
+                request = self._read_json()
+                status, response = gateway_state.register_apns_device(request)
+                self._send_json(status, response)
+                return
+
             if path.startswith("/v0/approvals/"):
                 parts = path.strip("/").split("/")
                 if len(parts) == 4 and parts[0] == "v0" and parts[1] == "approvals":

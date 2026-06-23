@@ -21,6 +21,7 @@ class GatewayState:
     runs: dict[str, dict[str, Any]] = field(default_factory=dict)
     approvals: dict[str, dict[str, Any]] = field(default_factory=dict)
     notification_tokens: dict[str, dict[str, Any]] = field(default_factory=dict)
+    apns_device_registrations: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def register_notification_token(self, payload: dict[str, Any]) -> dict[str, Any]:
         timestamp = now_iso()
@@ -37,6 +38,32 @@ class GatewayState:
         }
         self.notification_tokens[device_id] = record
         return {"notificationToken": record, "apnsGate": "developer_program_required" if not record["apnsAvailable"] else "ready"}
+
+    def register_apns_device(self, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        timestamp = now_iso()
+        device_id = str(payload.get("deviceId", "")).strip()
+        bundle_identifier = str(payload.get("bundleIdentifier", "")).strip()
+        token_redacted = payload.get("tokenRedacted")
+        enrolled = bool(payload.get("enrolledDeveloperProgram", False))
+        if not device_id or not bundle_identifier:
+            return 400, {"error": "invalid_apns_device_registration", "apnsGate": "invalid_request"}
+
+        record = {
+            "id": new_id("apns_device_registration"),
+            "deviceId": device_id,
+            "platform": str(payload.get("platform", "ios") or "ios"),
+            "environment": str(payload.get("environment", "development") or "development"),
+            "tokenState": "redacted_present" if token_redacted else "missing",
+            "bundleIdentifier": bundle_identifier,
+            "appVersion": payload.get("appVersion"),
+            "apnsAvailable": enrolled,
+            "createdAt": timestamp,
+        }
+        self.apns_device_registrations[device_id] = record
+        return 202, {
+            "registration": record,
+            "apnsGate": "ready" if record["apnsAvailable"] else "developer_program_required",
+        }
 
     def create_command(self, text: str) -> dict[str, Any]:
         timestamp = now_iso()

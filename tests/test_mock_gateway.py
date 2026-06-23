@@ -113,6 +113,43 @@ class MockGatewayTestCase(unittest.TestCase):
         self.assertEqual(data["apnsGate"], "developer_program_required")
         self.assertNotIn("secret", json.dumps(data).lower())
 
+    def test_apns_device_registration_contract_is_redacted_and_gated(self):
+        status, data = self.request("POST", "/v0/apns/device-registrations", {
+            "deviceId": "iphone-local",
+            "platform": "ios",
+            "tokenRedacted": "<redacted>",
+            "environment": "development",
+            "bundleIdentifier": "com.tinyleed.HermesAgentIOS",
+            "appVersion": "0.1.0",
+            "enrolledDeveloperProgram": False,
+        })
+
+        self.assertEqual(status, 202)
+        if data is None:
+            self.fail("APNs device registration should return JSON")
+        self.assertEqual(data["registration"]["deviceId"], "iphone-local")
+        self.assertEqual(data["registration"]["bundleIdentifier"], "com.tinyleed.HermesAgentIOS")
+        self.assertEqual(data["registration"]["tokenState"], "redacted_present")
+        self.assertFalse(data["registration"]["apnsAvailable"])
+        self.assertEqual(data["apnsGate"], "developer_program_required")
+        rendered = json.dumps(data).lower()
+        self.assertNotIn("bearer", rendered)
+        self.assertNotIn("authorization", rendered)
+
+    def test_apns_device_registration_rejects_missing_metadata(self):
+        status, data = self.request("POST", "/v0/apns/device-registrations", {
+            "deviceId": "",
+            "bundleIdentifier": "",
+            "tokenRedacted": "<redacted>",
+            "enrolledDeveloperProgram": True,
+        })
+
+        self.assertEqual(status, 400)
+        if data is None:
+            self.fail("invalid APNs device registration should return JSON")
+        self.assertEqual(data["error"], "invalid_apns_device_registration")
+        self.assertEqual(data["apnsGate"], "invalid_request")
+
     def test_unknown_route_returns_404(self):
         status, data = self.request("GET", "/v0/not-real")
 
