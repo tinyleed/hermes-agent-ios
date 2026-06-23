@@ -375,6 +375,20 @@ do {
     let gatedReadiness = NotificationReadinessState(enrollment: .personalTeam, localPermissionStatus: "authorized", hasRemoteDeviceToken: false, lastLocalNotificationAt: nil)
     expect(gatedReadiness.apnsGateLabel.contains("Apple Developer Program enrollment required"), "Personal Team notification readiness should still expose the APNs enrollment gate")
 
+    let coldLaunchPermissionPlan = NotificationPermissionRequestPlan.make(currentPermissionStatus: "not requested", context: .coldLaunch)
+    expect(!coldLaunchPermissionPlan.shouldRequestAuthorization, "notification permission should not be requested on cold launch")
+    expect(!coldLaunchPermissionPlan.shouldAllowNotificationScheduling, "cold launch should not schedule notifications before permission exists")
+    expect(coldLaunchPermissionPlan.reason.contains("cold launch"), "cold launch plan should document the lifecycle gate")
+    let blockingRequestPermissionPlan = NotificationPermissionRequestPlan.make(currentPermissionStatus: "not requested", context: .firstBlockingRequest)
+    expect(blockingRequestPermissionPlan.shouldRequestAuthorization, "first blocking request is the natural point to request notification permission")
+    expect(!blockingRequestPermissionPlan.shouldAllowNotificationScheduling, "permission prompt must complete before scheduling the notification")
+    let deniedPermissionPlan = NotificationPermissionRequestPlan.make(currentPermissionStatus: "denied", context: .firstBlockingRequest)
+    expect(!deniedPermissionPlan.shouldRequestAuthorization, "denied notification permission should not be re-prompted")
+    expect(!deniedPermissionPlan.shouldAllowNotificationScheduling, "denied notification permission should be handled without scheduling")
+    let authorizedPermissionPlan = NotificationPermissionRequestPlan.make(currentPermissionStatus: "authorized", context: .firstBlockingRequest)
+    expect(!authorizedPermissionPlan.shouldRequestAuthorization, "authorized notification permission should not prompt again")
+    expect(authorizedPermissionPlan.shouldAllowNotificationScheduling, "authorized notification permission should allow local scheduling")
+
     let apnsPayload = APNsApprovalNotificationPayload(runId: "run_live_abc", approvalId: "approval_123", command: "Review terminal command token=SECRET")
     let apnsEncoded = try JSONEncoder.hermesAgentGateway.encode(apnsPayload)
     let apnsString = String(data: apnsEncoded, encoding: .utf8)!
