@@ -212,6 +212,92 @@ public struct NotificationReadinessState: Codable, Equatable, Sendable {
     }
 }
 
+public enum NotificationPermissionRequestContext: String, Codable, Equatable, Sendable {
+    case coldLaunch = "cold_launch"
+    case explicitUserAction = "explicit_user_action"
+    case localNotificationProof = "local_notification_proof"
+    case firstBlockingRequest = "first_blocking_request"
+
+    public var operatorLabel: String {
+        switch self {
+        case .coldLaunch:
+            return "cold launch"
+        case .explicitUserAction:
+            return "explicit operator action"
+        case .localNotificationProof:
+            return "local notification proof"
+        case .firstBlockingRequest:
+            return "first blocking request"
+        }
+    }
+}
+
+public struct NotificationPermissionRequestPlan: Codable, Equatable, Sendable {
+    public let context: NotificationPermissionRequestContext
+    public let normalizedStatus: String
+    public let shouldRequestAuthorization: Bool
+    public let shouldAllowNotificationScheduling: Bool
+    public let reason: String
+
+    public init(context: NotificationPermissionRequestContext, normalizedStatus: String, shouldRequestAuthorization: Bool, shouldAllowNotificationScheduling: Bool, reason: String) {
+        self.context = context
+        self.normalizedStatus = normalizedStatus
+        self.shouldRequestAuthorization = shouldRequestAuthorization
+        self.shouldAllowNotificationScheduling = shouldAllowNotificationScheduling
+        self.reason = reason
+    }
+
+    public static func make(currentPermissionStatus: String, context: NotificationPermissionRequestContext) -> NotificationPermissionRequestPlan {
+        let normalizedStatus = normalizeStatus(currentPermissionStatus)
+        let isAuthorized = normalizedStatus == "authorized" || normalizedStatus == "provisional" || normalizedStatus == "ephemeral"
+        if isAuthorized {
+            return NotificationPermissionRequestPlan(
+                context: context,
+                normalizedStatus: normalizedStatus,
+                shouldRequestAuthorization: false,
+                shouldAllowNotificationScheduling: true,
+                reason: "Notification permission already allows scheduling"
+            )
+        }
+
+        if normalizedStatus == "denied" || normalizedStatus == "restricted" {
+            return NotificationPermissionRequestPlan(
+                context: context,
+                normalizedStatus: normalizedStatus,
+                shouldRequestAuthorization: false,
+                shouldAllowNotificationScheduling: false,
+                reason: "Notification permission is \(normalizedStatus); handle gracefully without prompting again"
+            )
+        }
+
+        switch context {
+        case .coldLaunch:
+            return NotificationPermissionRequestPlan(
+                context: context,
+                normalizedStatus: normalizedStatus,
+                shouldRequestAuthorization: false,
+                shouldAllowNotificationScheduling: false,
+                reason: "Do not request notification permission on cold launch before operator context exists"
+            )
+        case .explicitUserAction, .localNotificationProof, .firstBlockingRequest:
+            return NotificationPermissionRequestPlan(
+                context: context,
+                normalizedStatus: normalizedStatus,
+                shouldRequestAuthorization: true,
+                shouldAllowNotificationScheduling: false,
+                reason: "Request notification permission at \(context.operatorLabel)"
+            )
+        }
+    }
+
+    private static func normalizeStatus(_ status: String) -> String {
+        let normalized = status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalized.isEmpty { return "not requested" }
+        if normalized.hasPrefix("failed") { return "failed" }
+        return normalized
+    }
+}
+
 public struct NotificationTokenRegistrationPayload: Encodable, Equatable, Sendable {
     public let deviceId: String
     public let platform: String

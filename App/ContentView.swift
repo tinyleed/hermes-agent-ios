@@ -434,6 +434,7 @@ struct ContentView: View {
     @AppStorage("apnsDeviceRegistrationGate") private var apnsDeviceRegistrationGate = ""
     @AppStorage("apnsDeviceRegistrationUpdatedAt") private var apnsDeviceRegistrationUpdatedAt = 0.0
     @AppStorage("hermesAgentDeviceId") private var hermesAgentDeviceId = ""
+    @AppStorage("notificationPermissionPromptedForBlockingRequests") private var notificationPermissionPromptedForBlockingRequests = false
     @AppStorage("lastLocalApprovalNotificationAt") private var lastLocalApprovalNotificationAt = 0.0
     @AppStorage("pendingAppIntentRoute") private var pendingAppIntentRoute = ""
     @AppStorage("lastShareExtensionHandoff") private var lastShareExtensionHandoff = ""
@@ -1491,14 +1492,38 @@ struct ContentView: View {
     }
 
     @MainActor
-    private func requestLocalNotificationPermission() async {
+    @discardableResult
+    private func requestNotificationPermission(context: NotificationPermissionRequestContext) async -> Bool {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        notificationPermissionStatus = settings.authorizationStatus.operatorLabel
+        let plan = NotificationPermissionRequestPlan.make(currentPermissionStatus: notificationPermissionStatus, context: context)
+        guard plan.shouldRequestAuthorization else {
+            if !plan.shouldAllowNotificationScheduling {
+                lastStatus = "Notification permission not requested: \(plan.reason)"
+                recordOperatorLog(category: .capabilityCheck, title: "Notification readiness", detail: plan.reason, runId: nil)
+            }
+            return plan.shouldAllowNotificationScheduling
+        }
+
         do {
             let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
             notificationPermissionStatus = granted ? "authorized" : "denied"
-            recordOperatorLog(category: .runSubmitted, title: "Notification readiness", detail: "Local notification permission \(notificationPermissionStatus)", runId: nil)
+            lastStatus = granted
+                ? "Notification permission authorized after \(context.operatorLabel)"
+                : "Notification permission denied after \(context.operatorLabel)"
+            recordOperatorLog(category: .runSubmitted, title: "Notification readiness", detail: "Permission \(notificationPermissionStatus) after \(context.operatorLabel)", runId: nil)
+            return granted
         } catch {
             notificationPermissionStatus = "failed: \(error.localizedDescription)"
+            lastStatus = "Notification permission failed: \(error.localizedDescription)"
+            recordOperatorLog(category: .capabilityCheck, title: "Notification readiness", detail: "Permission request failed after \(context.operatorLabel): \(error.localizedDescription)", runId: nil)
+            return false
         }
+    }
+
+    @MainActor
+    private func requestLocalNotificationPermission() async {
+        _ = await requestNotificationPermission(context: .explicitUserAction)
     }
 
     @MainActor
@@ -1554,7 +1579,7 @@ struct ContentView: View {
     private func runLocalApprovalNotificationProof() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         if settings.authorizationStatus == .notDetermined {
-            await requestLocalNotificationPermission()
+            _ = await requestNotificationPermission(context: .localNotificationProof)
         } else {
             notificationPermissionStatus = settings.authorizationStatus.operatorLabel
         }
@@ -1597,7 +1622,12 @@ struct ContentView: View {
         guard !locallyNotifiedBlockingRequestIds.contains(request.id) else { return }
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         notificationPermissionStatus = settings.authorizationStatus.operatorLabel
-        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional || settings.authorizationStatus == .ephemeral else {
+        if settings.authorizationStatus == .notDetermined && !notificationPermissionPromptedForBlockingRequests {
+            notificationPermissionPromptedForBlockingRequests = true
+            _ = await requestNotificationPermission(context: .firstBlockingRequest)
+        }
+        guard notificationPermissionStatus == "authorized" || notificationPermissionStatus == "provisional" || notificationPermissionStatus == "ephemeral" else {
+            recordOperatorLog(category: .approvalDecision, title: "Local blocking notification skipped", detail: "Permission \(notificationPermissionStatus); blocking card remains visible in-app", runId: request.sessionId)
             return
         }
 

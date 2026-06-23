@@ -8,6 +8,7 @@ Current state:
 - `HermesAgentCore` contains gateway contracts, request builders, runtime reducers, and client seams.
 - Python mock gateways and Swift/Python contract tests cover local development flows.
 - The APNs device-registration gateway contract is defined at `/v0/apns/device-registrations`, with Swift request/response models, a client seam, redacted-token rules, mock-gateway contract tests, and iOS-side registration sync wiring after a device token is captured.
+- Notification permission is requested at operator-driven lifecycle points only: explicit diagnostics/proof actions or the first live blocking request, not cold launch.
 - The gateway-backed approval/sudo/secret blocking-card loop is proven end-to-end in the simulator and on a physically signed iPhone against the safe mock WebSocket gateway.
 - Approval, sudo, and secret blocking-card fixtures are represented with redacted response state, including the final output path.
 - The full local gate is `./scripts/test_all.sh`.
