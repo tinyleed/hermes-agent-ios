@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 #if canImport(ActivityKit)
 import ActivityKit
@@ -176,6 +177,34 @@ public struct APNsDeviceTokenState: Codable, Equatable, Sendable {
             return "<redacted>"
         }
         return String(trimmed.prefix(160))
+    }
+}
+
+public enum APNsDeviceTokenFingerprint: Sendable {
+    public static func make(for deviceToken: Data) -> String {
+        SHA256.hash(data: deviceToken)
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    public static func didRotate(previousFingerprint: String, currentFingerprint: String) -> Bool {
+        let previous = previousFingerprint.trimmingCharacters(in: .whitespacesAndNewlines)
+        let current = currentFingerprint.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !previous.isEmpty && !current.isEmpty && previous != current
+    }
+
+    public static func gatewayRegistrationNeedsSync(
+        currentFingerprint: String,
+        registeredFingerprint: String,
+        registrationId: String,
+        registrationGate: APNsDeviceRegistrationGate?
+    ) -> Bool {
+        let trimmedRegistrationId = registrationId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedRegistrationId.isEmpty, registrationGate == .ready else { return true }
+
+        let current = currentFingerprint.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !current.isEmpty else { return false }
+        return registeredFingerprint.trimmingCharacters(in: .whitespacesAndNewlines) != current
     }
 }
 
@@ -382,8 +411,9 @@ public struct APNsDeviceRegistration: Codable, Equatable, Sendable {
     public let appVersion: String?
     public let apnsAvailable: Bool
     public let createdAt: Date
+    public let replacesRegistrationId: String?
 
-    public init(id: String, deviceId: String, platform: String, environment: String, tokenState: String, bundleIdentifier: String, appVersion: String?, apnsAvailable: Bool, createdAt: Date) {
+    public init(id: String, deviceId: String, platform: String, environment: String, tokenState: String, bundleIdentifier: String, appVersion: String?, apnsAvailable: Bool, createdAt: Date, replacesRegistrationId: String? = nil) {
         self.id = id
         self.deviceId = deviceId
         self.platform = platform
@@ -393,6 +423,7 @@ public struct APNsDeviceRegistration: Codable, Equatable, Sendable {
         self.appVersion = appVersion
         self.apnsAvailable = apnsAvailable
         self.createdAt = createdAt
+        self.replacesRegistrationId = replacesRegistrationId
     }
 
     public var operatorLabel: String {
@@ -402,7 +433,7 @@ public struct APNsDeviceRegistration: Codable, Equatable, Sendable {
     }
 
     public var isSecretSafeForDisplay: Bool {
-        let joined = [id, deviceId, platform, environment, tokenState, bundleIdentifier, appVersion ?? "", operatorLabel].joined(separator: " ").lowercased()
+        let joined = [id, deviceId, platform, environment, tokenState, bundleIdentifier, appVersion ?? "", replacesRegistrationId ?? "", operatorLabel].joined(separator: " ").lowercased()
         return !joined.contains("token=")
             && !joined.contains("bearer")
             && !joined.contains("authorization")
