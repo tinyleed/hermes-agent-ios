@@ -348,13 +348,15 @@ do {
             bundleIdentifier: "com.tinyleed.HermesAgentIOS",
             appVersion: "0.1.0",
             apnsAvailable: true,
-            createdAt: Date(timeIntervalSince1970: 1780477500.0)
+            createdAt: Date(timeIntervalSince1970: 1780477500.0),
+            replacesRegistrationId: "apns_device_registration_old"
         ),
         apnsGate: .ready
     )
     let encodedRegistrationResponse = try JSONEncoder.hermesAgentGateway.encode(apnsRegistrationResponse)
     let decodedRegistrationResponse = try JSONDecoder.hermesAgentGateway.decode(APNsDeviceRegistrationResponse.self, from: encodedRegistrationResponse)
     expect(decodedRegistrationResponse == apnsRegistrationResponse, "APNs device registration response should round-trip through JSON")
+    expect(decodedRegistrationResponse.registration.replacesRegistrationId == "apns_device_registration_old", "APNs device registration response should expose safe replacement metadata")
     expect(decodedRegistrationResponse.registration.operatorLabel.contains("<redacted>"), "APNs device registration operator label should remain redacted")
     expect(decodedRegistrationResponse.registration.isSecretSafeForDisplay, "APNs device registration response should be display-safe")
     expect(APNsDeviceRegistrationGate.developerProgramRequired.operatorLabel.contains("Developer Program"), "APNs gate should explain Developer Program requirement")
@@ -364,6 +366,15 @@ do {
     expect(capturedTokenState.operatorLabel.contains("<redacted>"), "APNs token operator label should be redacted")
     expect(capturedTokenState.operatorLabel.contains("32 bytes"), "APNs token operator label should expose safe byte-count metadata")
     expect(capturedTokenState.isSecretSafeForDisplay, "APNs captured token state should be display-safe")
+    let firstTokenFingerprint = APNsDeviceTokenFingerprint.make(for: Data([0x01, 0x02, 0x03, 0x04]))
+    let rotatedTokenFingerprint = APNsDeviceTokenFingerprint.make(for: Data([0x04, 0x03, 0x02, 0x01]))
+    expect(firstTokenFingerprint.count == 64, "APNs token fingerprint should be a fixed-width SHA-256 digest")
+    expect(firstTokenFingerprint != "01020304", "APNs token fingerprint must not persist raw token bytes")
+    expect(!APNsDeviceTokenFingerprint.didRotate(previousFingerprint: "", currentFingerprint: firstTokenFingerprint), "first APNs token capture is not a rotation")
+    expect(APNsDeviceTokenFingerprint.didRotate(previousFingerprint: firstTokenFingerprint, currentFingerprint: rotatedTokenFingerprint), "APNs token fingerprint change should be treated as rotation")
+    expect(!APNsDeviceTokenFingerprint.gatewayRegistrationNeedsSync(currentFingerprint: firstTokenFingerprint, registeredFingerprint: firstTokenFingerprint, registrationId: "apns_device_registration_abc", registrationGate: .ready), "matching token fingerprint and ready registration should not re-sync")
+    expect(APNsDeviceTokenFingerprint.gatewayRegistrationNeedsSync(currentFingerprint: rotatedTokenFingerprint, registeredFingerprint: firstTokenFingerprint, registrationId: "apns_device_registration_abc", registrationGate: .ready), "rotated token fingerprint should force gateway re-registration")
+    expect(APNsDeviceTokenFingerprint.gatewayRegistrationNeedsSync(currentFingerprint: firstTokenFingerprint, registeredFingerprint: "", registrationId: "", registrationGate: nil), "missing gateway registration should sync captured token")
     let failedTokenState = APNsDeviceTokenState.failed(reason: "authorization bearer token=SHOULD_NOT_RENDER", at: 1780477400.0)
     expect(failedTokenState.failureReasonRedacted == "<redacted>", "APNs failure reason should redact token-like material")
     expect(!failedTokenState.operatorLabel.contains("SHOULD_NOT_RENDER"), "APNs failure label must not expose secret-like material")

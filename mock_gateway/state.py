@@ -48,6 +48,7 @@ class GatewayState:
         if not device_id or not bundle_identifier:
             return 400, {"error": "invalid_apns_device_registration", "apnsGate": "invalid_request"}
 
+        previous = self.apns_device_registrations.get(device_id)
         record = {
             "id": new_id("apns_device_registration"),
             "deviceId": device_id,
@@ -58,6 +59,7 @@ class GatewayState:
             "appVersion": payload.get("appVersion"),
             "apnsAvailable": enrolled,
             "createdAt": timestamp,
+            "replacesRegistrationId": previous.get("id") if previous else None,
         }
         self.apns_device_registrations[device_id] = record
         return 202, {

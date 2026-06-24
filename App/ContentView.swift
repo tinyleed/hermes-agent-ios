@@ -433,6 +433,10 @@ struct ContentView: View {
     @AppStorage("apnsDeviceRegistrationId") private var apnsDeviceRegistrationId = ""
     @AppStorage("apnsDeviceRegistrationGate") private var apnsDeviceRegistrationGate = ""
     @AppStorage("apnsDeviceRegistrationUpdatedAt") private var apnsDeviceRegistrationUpdatedAt = 0.0
+    @AppStorage("apnsDeviceTokenFingerprint") private var apnsDeviceTokenFingerprint = ""
+    @AppStorage("apnsDeviceRegistrationTokenFingerprint") private var apnsDeviceRegistrationTokenFingerprint = ""
+    @AppStorage("apnsDeviceTokenRotationCount") private var apnsDeviceTokenRotationCount = 0
+    @AppStorage("apnsDeviceTokenRotatedAt") private var apnsDeviceTokenRotatedAt = 0.0
     @AppStorage("hermesAgentDeviceId") private var hermesAgentDeviceId = ""
     @AppStorage("notificationPermissionPromptedForBlockingRequests") private var notificationPermissionPromptedForBlockingRequests = false
     @AppStorage("lastLocalApprovalNotificationAt") private var lastLocalApprovalNotificationAt = 0.0
@@ -656,9 +660,16 @@ struct ContentView: View {
 
     private var apnsGatewayRegistrationLabel: String {
         guard !apnsDeviceRegistrationId.isEmpty else {
+            if apnsDeviceTokenRotationCount > 0 && apnsDeviceTokenRotatedAt > apnsDeviceRegistrationUpdatedAt {
+                return "Gateway APNs device registration: re-sync pending after token rotation · <redacted>"
+            }
             return "Gateway APNs device registration: not synced"
         }
         let gate = APNsDeviceRegistrationGate(rawValue: apnsDeviceRegistrationGate)?.operatorLabel ?? "APNs registration gate unknown"
+        if !apnsDeviceTokenFingerprint.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           apnsDeviceRegistrationTokenFingerprint.trimmingCharacters(in: .whitespacesAndNewlines) != apnsDeviceTokenFingerprint.trimmingCharacters(in: .whitespacesAndNewlines) {
+            return "Gateway APNs device registration: stale after token rotation · <redacted>"
+        }
         return "Gateway APNs device registration: \(gate) · <redacted>"
     }
 
@@ -1154,6 +1165,10 @@ struct ContentView: View {
                 guard status == APNsDeviceTokenRegistrationStatus.captured.rawValue else { return }
                 Task { await syncCapturedAPNsDeviceRegistrationIfPossible(reason: "device token captured") }
             }
+            .onChange(of: apnsRegistrationUpdatedAt) { _, _ in
+                guard apnsRegistrationStatus == APNsDeviceTokenRegistrationStatus.captured.rawValue else { return }
+                Task { await syncCapturedAPNsDeviceRegistrationIfPossible(reason: "device token update") }
+            }
         }
     }
 
@@ -1552,12 +1567,19 @@ struct ContentView: View {
             recordOperatorLog(category: .capabilityCheck, title: "APNs gateway registration", detail: "Skipped unsafe APNs registration payload", runId: nil)
             return
         }
-        guard apnsDeviceRegistrationId.isEmpty || apnsDeviceRegistrationGate != APNsDeviceRegistrationGate.ready.rawValue else { return }
+        let currentGate = APNsDeviceRegistrationGate(rawValue: apnsDeviceRegistrationGate)
+        guard APNsDeviceTokenFingerprint.gatewayRegistrationNeedsSync(
+            currentFingerprint: apnsDeviceTokenFingerprint,
+            registeredFingerprint: apnsDeviceRegistrationTokenFingerprint,
+            registrationId: apnsDeviceRegistrationId,
+            registrationGate: currentGate
+        ) else { return }
 
         do {
             let response = try await gatewayClient.registerAPNsDevice(payload)
             apnsDeviceRegistrationId = response.registration.id
             apnsDeviceRegistrationGate = response.apnsGate.rawValue
+            apnsDeviceRegistrationTokenFingerprint = apnsDeviceTokenFingerprint
             apnsDeviceRegistrationUpdatedAt = Date().timeIntervalSince1970
             lastStatus = response.apnsGate == .ready
                 ? "APNs device registered with gateway (<redacted>)"

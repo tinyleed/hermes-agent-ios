@@ -29,12 +29,36 @@ final class HermesAgentAppDelegate: NSObject, UIApplicationDelegate, UNUserNotif
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let defaults = UserDefaults.standard
-        defaults.set(APNsDeviceTokenRegistrationStatus.captured.rawValue, forKey: "apnsRegistrationStatus")
+        let timestamp = Date().timeIntervalSince1970
+        let fingerprint = APNsDeviceTokenFingerprint.make(for: deviceToken)
+        let previousFingerprint = defaults.string(forKey: "apnsDeviceTokenFingerprint") ?? ""
+        let registeredFingerprint = defaults.string(forKey: "apnsDeviceRegistrationTokenFingerprint") ?? ""
+        let registrationId = defaults.string(forKey: "apnsDeviceRegistrationId") ?? ""
+        let registrationGate = APNsDeviceRegistrationGate(rawValue: defaults.string(forKey: "apnsDeviceRegistrationGate") ?? "")
+        let didRotate = APNsDeviceTokenFingerprint.didRotate(previousFingerprint: previousFingerprint, currentFingerprint: fingerprint)
+
         defaults.set(deviceToken.count, forKey: "apnsDeviceTokenByteCount")
-        defaults.set(Date().timeIntervalSince1970, forKey: "apnsRegistrationUpdatedAt")
+        defaults.set(fingerprint, forKey: "apnsDeviceTokenFingerprint")
         defaults.set("", forKey: "apnsRegistrationFailureRedacted")
-        defaults.set("", forKey: "apnsDeviceRegistrationId")
-        defaults.set("", forKey: "apnsDeviceRegistrationGate")
+        if didRotate {
+            defaults.set(defaults.integer(forKey: "apnsDeviceTokenRotationCount") + 1, forKey: "apnsDeviceTokenRotationCount")
+            defaults.set(timestamp, forKey: "apnsDeviceTokenRotatedAt")
+        }
+
+        let needsGatewaySync = APNsDeviceTokenFingerprint.gatewayRegistrationNeedsSync(
+            currentFingerprint: fingerprint,
+            registeredFingerprint: registeredFingerprint,
+            registrationId: registrationId,
+            registrationGate: registrationGate
+        )
+        if needsGatewaySync {
+            defaults.set("", forKey: "apnsDeviceRegistrationId")
+            defaults.set("", forKey: "apnsDeviceRegistrationGate")
+            defaults.set("", forKey: "apnsDeviceRegistrationTokenFingerprint")
+            defaults.set(0.0, forKey: "apnsDeviceRegistrationUpdatedAt")
+        }
+        defaults.set(APNsDeviceTokenRegistrationStatus.captured.rawValue, forKey: "apnsRegistrationStatus")
+        defaults.set(timestamp, forKey: "apnsRegistrationUpdatedAt")
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {

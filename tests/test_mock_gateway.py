@@ -150,6 +150,42 @@ class MockGatewayTestCase(unittest.TestCase):
         self.assertEqual(data["error"], "invalid_apns_device_registration")
         self.assertEqual(data["apnsGate"], "invalid_request")
 
+    def test_apns_device_registration_rotation_replaces_redacted_registration(self):
+        first_status, first = self.request("POST", "/v0/apns/device-registrations", {
+            "deviceId": "iphone-local",
+            "platform": "ios",
+            "tokenRedacted": "<redacted>",
+            "environment": "development",
+            "bundleIdentifier": "com.tinyleed.HermesAgentIOS",
+            "appVersion": "0.1.0",
+            "enrolledDeveloperProgram": True,
+        })
+        self.assertEqual(first_status, 202)
+        if first is None:
+            self.fail("initial APNs registration should return JSON")
+
+        second_status, second = self.request("POST", "/v0/apns/device-registrations", {
+            "deviceId": "iphone-local",
+            "platform": "ios",
+            "tokenRedacted": "<redacted>",
+            "environment": "development",
+            "bundleIdentifier": "com.tinyleed.HermesAgentIOS",
+            "appVersion": "0.1.1",
+            "enrolledDeveloperProgram": True,
+        })
+
+        self.assertEqual(second_status, 202)
+        if second is None:
+            self.fail("rotated APNs registration should return JSON")
+        self.assertNotEqual(first["registration"]["id"], second["registration"]["id"])
+        self.assertEqual(second["registration"]["replacesRegistrationId"], first["registration"]["id"])
+        self.assertEqual(second["registration"]["tokenState"], "redacted_present")
+        self.assertEqual(second["apnsGate"], "ready")
+        rendered = json.dumps(second).lower()
+        self.assertNotIn("raw", rendered)
+        self.assertNotIn("bearer", rendered)
+        self.assertNotIn("authorization", rendered)
+
     def test_unknown_route_returns_404(self):
         status, data = self.request("GET", "/v0/not-real")
 
