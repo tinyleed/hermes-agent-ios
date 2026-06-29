@@ -1,8 +1,8 @@
 # Status
 
-Hermes Agent iOS is an early open-source iPhone operator cockpit for Hermes Agent.
+Hermes Agent iOS is shelved. The repository remains available as a reference implementation / historical experiment for a native iPhone operator cockpit for Hermes Agent, but it is not an active implementation queue.
 
-Current state:
+Current technical state before shelving:
 
 - SwiftUI app shell and command/chat cockpit exist.
 - `HermesAgentCore` contains gateway contracts, request builders, runtime reducers, and client seams.
@@ -15,12 +15,19 @@ Current state:
 - The full local gate is `./scripts/test_all.sh`.
 - The targeted gateway-backed blocking loop proof is `./scripts/test_blocking_fixture_gateway_ui.sh`.
 
+Shelving rules:
+
+- Do not treat open issues as an active queue.
+- Do not start APNs, Live Activity, notification, or gateway polish work by default.
+- If the project is reopened, first re-check the broader Hermes Agent mobile/product direction and define a differentiated scope before selecting issues.
+- Keep all existing secret-redaction and local-signing rules intact.
+
 Known limitations:
 
-- The project is not yet production-ready or App Store-ready.
+- The project is not production-ready or App Store-ready.
 - Physical-device flows require local signing and a reachable private Hermes host.
-- Physical-device gateway proof is currently a local/private-host verification path; a contributor-safe repeatable device harness is still pending.
+- Physical-device gateway proof is a local/private-host verification path; a contributor-safe repeatable device harness was not completed before shelving.
 - Hosted/public gateway auth is intentionally deferred.
 - The Share Extension activation rule is narrowed for text and one web URL; broader media/file support still needs deliberate design before App Store/TestFlight submission.
 
-See [`ROADMAP.md`](ROADMAP.md) for current priorities.
+See [`ROADMAP.md`](ROADMAP.md) for historical project direction.
