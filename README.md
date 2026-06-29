@@ -5,15 +5,15 @@
 [![Swift 6](https://img.shields.io/badge/Swift-6-orange.svg)](Package.swift)
 [![iOS 17+](https://img.shields.io/badge/iOS-17%2B-lightgrey.svg)](project.yml)
 
-**A native iPhone operator cockpit for Hermes Agent — built for mobile chat, human approvals, secret-redacted gateway control, and safe supervision of agentic workflows.**
+**A shelved native iPhone operator-cockpit experiment for Hermes Agent — built around mobile chat, human approvals, secret-redacted gateway control, and safe supervision of agentic workflows.**
 
-Hermes Agent iOS keeps execution in [Hermes Agent](https://hermes-agent.nousresearch.com/) and turns the phone into the control surface: see what an agent is doing, approve risky steps, answer blocking prompts, and keep secrets out of transcripts and logs.
+This repository is currently shelved and retained as a reference implementation / historical experiment. The app keeps execution in [Hermes Agent](https://hermes-agent.nousresearch.com/) and turns the phone into the control surface: see what an agent is doing, approve risky steps, answer blocking prompts, and keep secrets out of transcripts and logs.
 
 ![Synthetic Hermes Agent iOS operator cockpit screenshot](docs/assets/hermes-agent-ios-synthetic-cockpit.png)
 
 | Status | Focus | Safety posture |
 | --- | --- | --- |
-| Early-stage, simulator-first | Operator UX for mobile agent supervision | Deterministic fixtures, explicit approvals, redacted secret/sudo flows |
+| Shelved / reference implementation | Operator UX for mobile agent supervision | Deterministic fixtures, explicit approvals, redacted secret/sudo flows |
 
 ## Why it exists
 
@@ -140,11 +140,11 @@ Then launch the simulator helper:
 
 ## Project status
 
-This project is a clean open-source release of an actively developed iOS companion for Hermes Agent. It is not yet a production App Store app. See [`ROADMAP.md`](ROADMAP.md) for current priorities.
+This project is a clean open-source reference implementation / historical experiment for an iOS companion to Hermes Agent. It is currently shelved and is not a production App Store app. See [`ROADMAP.md`](ROADMAP.md) for historical direction.
 
 ## Contributing
 
-Contributions are welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`docs/maintainer-workflow.md`](docs/maintainer-workflow.md), and treat changes around gateway auth, approval handling, deep links, bootstrap artifacts, and secret display as security-sensitive.
+This repository is not under active development while shelved. If work resumes, start with [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`docs/maintainer-workflow.md`](docs/maintainer-workflow.md), and treat changes around gateway auth, approval handling, deep links, bootstrap artifacts, and secret display as security-sensitive.
 
 ## Security
 
